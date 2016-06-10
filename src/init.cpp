@@ -798,9 +798,11 @@ static void PostInitStats(bool perProcessDir, Config& config) {
 
     if (zinfo->statsPhaseInterval) {
         const char* periodicStatsFilter = config.get<const char*>("sim.periodicStatsFilter", "");
+		uint32_t periodicChunkSize = config.get<uint32_t>("sim.periodicStatsSize", 1 << 10 );
+        assert(periodicChunkSize > 0 );
         AggregateStat* prStat = (!strlen(periodicStatsFilter))? zinfo->rootStat : FilterStats(zinfo->rootStat, periodicStatsFilter);
         if (!prStat) panic("No stats match sim.periodicStatsFilter regex (%s)! Set interval to 0 to avoid periodic stats", periodicStatsFilter);
-        zinfo->periodicStatsBackend = new HDF5Backend(pStatsFile, prStat, (1 << 20) /* 1MB chunks */, zinfo->skipStatsVectors, zinfo->compactPeriodicStats);
+        zinfo->periodicStatsBackend = new HDF5Backend(pStatsFile, prStat, periodicChunkSize , zinfo->skipStatsVectors, zinfo->compactPeriodicStats);
         zinfo->periodicStatsBackend->dump(true); //must have a first sample
 
         class PeriodicStatsDumpEvent : public Event {
