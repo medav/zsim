@@ -377,16 +377,28 @@ CacheGroup* BuildCacheGroup(Config& config, const string& name, bool isTerminal)
 
     string prefix = "sys.caches." + name + ".";
 
+
+    uint32_t size = config.get<uint32_t>(prefix + "size", 64*1024);
+    uint32_t banks = config.get<uint32_t>(prefix + "banks", 1);
+    uint32_t caches = config.get<uint32_t>(prefix + "caches", 1);
+
+    assert(((banks > 0) && (size  > 0)));
+
+    uint32_t bankSize = size/banks;
+
+
     bool isPrefetcher = config.get<bool>(prefix + "isPrefetcher", false);
     if (isPrefetcher) { //build a prefetcher group
         uint32_t prefetchers = config.get<uint32_t>(prefix + "prefetchers", 1);
+        uint32_t entrySize = config.get<uint32_t>(prefix + "entries", 16);
+        assert(entrySize > 0);
         cg.resize(prefetchers);
         for (vector<BaseCache*>& bg : cg) bg.resize(1);
         for (uint32_t i = 0; i < prefetchers; i++) {
             stringstream ss;
             ss << name << "-" << i;
             g_string pfName(ss.str().c_str());
-            cg[i][0] = new StreamPrefetcher(pfName);
+            cg[i][0] = new StreamPrefetcher(pfName, bankSize/zinfo->lineSize, entrySize);
         }
         return cgp;
     }
