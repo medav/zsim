@@ -403,11 +403,6 @@ CacheGroup* BuildCacheGroup(Config& config, const string& name, bool isTerminal)
         return cgp;
     }
 
-    uint32_t size = config.get<uint32_t>(prefix + "size", 64*1024);
-    uint32_t banks = config.get<uint32_t>(prefix + "banks", 1);
-    uint32_t caches = config.get<uint32_t>(prefix + "caches", 1);
-
-    uint32_t bankSize = size/banks;
     if (size % banks != 0) {
         panic("%s: banks (%d) does not divide the size (%d bytes)", name.c_str(), banks, size);
     }
