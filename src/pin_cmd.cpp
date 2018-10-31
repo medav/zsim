@@ -56,6 +56,9 @@ PinCmd::PinCmd(Config* conf, const char* configFile, const char* outputDir, uint
     args.push_back("-tool_exit_timeout"); //don't wait much of internal threads
     args.push_back("1");
 
+    args.push_back("-injection");
+    args.push_back("child");
+
     //Additional options (e.g., -smc_strict for Java), parsed from config
     const char* pinOptions = conf->get<const char*>("sim.pinOptions", "");
     wordexp_t p;
