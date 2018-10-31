@@ -7,8 +7,8 @@ What is this? It's like Zsim, but actually has installation steps and usage for 
 
 # Installation Steps
 1. sudo apt install git build-essential gcc-5 g++-5 scons libelf-dev
-2. git clone zsim
+2. git clone https://github.com/medav/zsim.git
 3. tar xvf deps.tar.gz
 4. source deps/env.sh
-5. scons -j2
+5. scons -jN
 6. ./build/opt/zsim tests/simple.cfg
