@@ -29,9 +29,9 @@ def buildSim(cppFlags, dir, type, pgo=None):
     #env['CXX'] = 'g++ -flto -flto-report -fuse-linker-plugin'
     #env['CC'] = 'gcc -flto'
     #env["LINKFLAGS"] = " -O3 -finline "
-    if useIcc:
-        env['CC'] = 'icc'
-        env['CXX'] = 'icpc -ipo'
+    
+    env['CC'] = 'gcc-5'
+    env['CXX'] = 'g++-5'
 
     # Required paths
     if "PINPATH" in os.environ:
@@ -47,8 +47,7 @@ def buildSim(cppFlags, dir, type, pgo=None):
     # NOTE: Original Pin flags included -fno-strict-aliasing, but zsim does not do type punning
     # NOTE (dsm 16 Apr 2015): Update flags code to support Pin 2.14 while retaining backwards compatibility
     env["CPPFLAGS"] += " -g -std=c++0x -Wall -Wno-unknown-pragmas -fomit-frame-pointer -fno-stack-protector"
-    env["CPPFLAGS"] += " -MMD -DBIGARRAY_MULTIPLIER=1 -DUSING_XED -DTARGET_IA32E -DHOST_IA32E -fPIC -DTARGET_LINUX"
-
+    env["CPPFLAGS"] += " -MMD -DBIGARRAY_MULTIPLIER=1 -DUSING_XED -DTARGET_IA32E -DHOST_IA32E -fPIC -DTARGET_LINUX -D_GLIBCXX_USE_CXX11_ABI=0 -fabi-version=2"
     # Pin 2.12+ kits have changed the layout of includes, detect whether we need
     # source/include/ or source/include/pin/
     pinInclDir = joinpath(PINPATH, "source/include/")
@@ -68,6 +67,8 @@ def buildSim(cppFlags, dir, type, pgo=None):
             pinInclDir, joinpath(pinInclDir, "gen"),
             joinpath(PINPATH, "extras/components/include")]
 
+    env["CPPPATH"] += os.environ["USERINC"].split(":")
+
     # Perform trace logging?
     ##env["CPPFLAGS"] += " -D_LOG_TRACE_=1"
 
@@ -75,7 +76,7 @@ def buildSim(cppFlags, dir, type, pgo=None):
     ##env["CPPFLAGS"] += " -DDEBUG=1"
 
     # Be a Warning Nazi? (recommended)
-    env["CPPFLAGS"] += " -Werror "
+    #env["CPPFLAGS"] += " -Werror "
 
     # Enables lib and harness to use the same info/log code,
     # but only lib uses pin locks for thread safety
@@ -107,7 +108,7 @@ def buildSim(cppFlags, dir, type, pgo=None):
     env["PINLIBS"] = ["pin", "xed", pindwarfLib, "elf", "dl", "rt"]
 
     # Non-pintool libraries
-    env["LIBPATH"] = []
+    env["LIBPATH"] = os.environ["USERLIB"].split(":")
     env["LIBS"] = ["config++"]
 
     env["LINKFLAGS"] = ""
