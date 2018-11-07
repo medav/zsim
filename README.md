@@ -12,3 +12,4 @@ What is this? It's like Zsim, but actually has installation steps and usage for 
 4. source deps/env.sh
 5. scons -jN
 6. ./build/opt/zsim tests/simple.cfg
+
