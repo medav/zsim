@@ -6,7 +6,7 @@
 sys = {
     cores = {
         c = {
-            cores = 64;
+            cores = {num_cores};
             type = "Timing";
             dcache = "l1d";
             icache = "l1i";
@@ -17,25 +17,26 @@ sys = {
 
     caches = {
         l1d = {
-            caches = 64;
-            size = 65536;
+            caches = {num_cores};
+            size = {l1d_size};
             latency = 4;
         };
 
         l1i = {
-            caches = 64;
-            size = 32768;
+            caches = {num_cores};
+            size = {l1i_size};
             latency = 3;
         };
 
         l2 = {
-            size = 1048576;
+            size = {l2_size};
             children = "l1d|l1i";
+            type = "Timing";
         };
 
         l3 = {
             caches = 1;
-            size = 16777216;
+            size = {l3_size};
             latency = 27;
             children = "l2";
             type = "Timing";
@@ -45,9 +46,9 @@ sys = {
 
     frequency = 2270;
     mem = {
-        type = "DDR";
+        type = "MD1";
         controllers = 1;
-        tech = "DDR3-1066-CL8";
+        bandwidth = {peak_bw};
     };
 };
 
@@ -57,6 +58,6 @@ sim = {
 };
 
 process0 = {
-    command = "./apps/matmul/naive-matmul";
+    command = "./apps/matmul/naive-matmul {num_cores} 500";
     startFastForwarded = False;
 };
