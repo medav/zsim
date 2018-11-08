@@ -70,26 +70,30 @@ int main() {
     global_data * gd = new global_data;
     std::vector<std::thread> threads;
 
-    read_csv(gd->mat_a, "mat_a.csv");
-    read_csv(gd->mat_b, "mat_b.csv");
+    printf("Reading matrices\n");
+    read_csv(gd->mat_a, "apps/matmul/mat_a.csv");
+    read_csv(gd->mat_b, "apps/matmul/mat_b.csv");
+
     memset(gd->output, 0x00, MATSIZE * MATSIZE * sizeof(int));
 
+    printf("Setting affinity for thread 0\n");
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
     CPU_SET(0, &cpuset);
     int rc = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
 
+    printf("Spawning worker threads\n");
     for (int id = 1; id < NUMTILES; id++) {
         threads.push_back(std::thread(worker, id, gd));
     }
 
+    printf("Working...\n");
     worker(0, gd);
 
+    printf("Waiting for threads...\n");
     for (int id = 0; id < NUMTILES - 1; id++) {
         threads[id].join();
     }
-
-    delete gd;
 
     for (int row = 0; row < MATSIZE; row++) {
         for (int col = 0; col < MATSIZE; col++) {
@@ -97,6 +101,8 @@ int main() {
         }
         printf("\n");
     }
+
+    delete gd;
 
     return 0;
 }
