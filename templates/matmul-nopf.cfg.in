@@ -29,6 +29,7 @@ sys = {
         };
 
         l2 = {
+            caches = {num_cores};
             size = {l2_size};
             children = "l1d|l1i";
             type = "Timing";
@@ -53,11 +54,12 @@ sys = {
 };
 
 sim = {
+    logToFile = true;
     phaseLength = 1000;
     printHierarchy = true;
 };
 
 process0 = {
-    command = "./apps/matmul/naive-matmul {num_cores} 500";
+    command = "naive-matmul {num_cores} {mat_size}";
     startFastForwarded = False;
 };
