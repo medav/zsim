@@ -1,0 +1,91 @@
+// Tests zsim hooks for different programming languages To build tests, run
+// make -j -C misc/hooks You can run the real tests with make -C misc/hooks
+// run_tests This uses logToFile because some JVMs need transparency (they fork
+// and use pipes, and writing to stdout/stderr breaks those pipes)
+
+sys = {
+    cores = {
+        c = {
+            cores = {num_cores}; 
+            type = "Timing";
+            dcache = "l1d";
+            icache = "l1i";
+        };
+    };
+
+    lineSize = 64;
+
+    caches = {
+        l1d = {
+            caches = {num_cores}; // equal to the number of cores - each core has private l1/l2 cache
+            size = {l1d_size};
+            latency = 4;
+            array : 
+            {
+                ways = 2;
+                type = "SetAssoc";
+            };
+        };
+        l1i = {
+            caches = {num_cores};
+            size = {l1i_size};
+            latency = 3;
+            array : 
+            {
+                ways = 2;
+                type = "SetAssoc";
+            };
+        };
+        pf = {
+            isPrefetcher = true;
+            prefetchers = {num_cores};
+            children = "l1d";
+        }
+
+        l2 = {
+            type="Simple";
+            array = {
+                type = "SetAssoc";
+                ways = 8;
+            };
+            caches = {num_cores};
+            banks = 1;
+            latency = 2;
+            children = "pf|l1i";
+            repl = {
+                type = "LRU";
+            };
+            size = {l2_size};
+        };
+        
+        l3 = {
+            caches = 1;
+            size = {l3_size};
+            latency = 27;
+            children = "l2";
+            type = "Simple";
+        };
+    };
+
+    frequency = 2270;  # System frequency, not memory
+    mem = {
+        type = "MD1";
+        controllers = 1;
+        bandwidth = {peak_bw};
+    };
+};
+
+sim = {
+    logToFile = true;
+    phaseLength = 1000;
+    printHierarchy = true;
+};
+
+process0 = {
+    command = "naive-matmul {num_cores} {mat_size}";
+    startFastForwarded = False;
+};
+
+#process0 = {
+#    command = "ls -alh --color tests/";
+#};
