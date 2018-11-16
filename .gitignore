@@ -1,3 +1,9 @@
 deps
 build
 tests
+.vscode
+*.h5
+*.out
+*.log.*
+**/__PYCACHE__
+*.pyc
