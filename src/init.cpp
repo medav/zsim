@@ -55,7 +55,6 @@
 #include "ooo_core.h"
 #include "part_repl_policies.h"
 #include "pin_cmd.h"
-#include "prefetcher.h"
 #include "proc_stats.h"
 #include "process_stats.h"
 #include "process_tree.h"
@@ -82,7 +81,7 @@ extern void EndOfPhaseActions(); //in zsim.cpp
  * follow the layout of zinfo, top-down.
  */
 
-BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, uint32_t bankSize, bool isTerminal, uint32_t domain) {
+BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, uint32_t bankSize, bool isTerminal, uint32_t domain, bool isPrefetcher) {
     string type = config.get<const char*>(prefix + "type", "Simple");
     // Shortcut for TraceDriven type
     if (type == "TraceDriven") {
@@ -287,7 +286,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
         //Filter cache optimization
         if (type != "Simple") panic("Terminal cache %s can only have type == Simple", name.c_str());
         if (arrayType != "SetAssoc" || hashType != "None" || replType != "LRU") panic("Invalid FilterCache config %s", name.c_str());
-        cache = new FilterCache(numSets, numLines, cc, array, rp, accLat, invLat, name);
+        cache = new FilterCache(numSets, numLines, cc, array, rp, accLat, invLat, isPrefetcher, name);
     }
 
 #if 0
@@ -381,27 +380,11 @@ CacheGroup* BuildCacheGroup(Config& config, const string& name, bool isTerminal)
     uint32_t size = config.get<uint32_t>(prefix + "size", 64*1024);
     uint32_t banks = config.get<uint32_t>(prefix + "banks", 1);
     uint32_t caches = config.get<uint32_t>(prefix + "caches", 1);
+    bool isPrefetcher = config.get<bool>(prefix + "isPrefetcher", false);
 
     assert(((banks > 0) && (size  > 0)));
 
     uint32_t bankSize = size/banks;
-
-
-    bool isPrefetcher = config.get<bool>(prefix + "isPrefetcher", false);
-    if (isPrefetcher) { //build a prefetcher group
-        uint32_t prefetchers = config.get<uint32_t>(prefix + "prefetchers", 1);
-        uint32_t entrySize = config.get<uint32_t>(prefix + "entries", 16);
-        assert(entrySize > 0);
-        cg.resize(prefetchers);
-        for (vector<BaseCache*>& bg : cg) bg.resize(1);
-        for (uint32_t i = 0; i < prefetchers; i++) {
-            stringstream ss;
-            ss << name << "-" << i;
-            g_string pfName(ss.str().c_str());
-            cg[i][0] = new StreamPrefetcher(pfName, bankSize/zinfo->lineSize, entrySize);
-        }
-        return cgp;
-    }
 
     if (size % banks != 0) {
         panic("%s: banks (%d) does not divide the size (%d bytes)", name.c_str(), banks, size);
@@ -419,7 +402,7 @@ CacheGroup* BuildCacheGroup(Config& config, const string& name, bool isTerminal)
             }
             g_string bankName(ss.str().c_str());
             uint32_t domain = (i*banks + j)*zinfo->numDomains/(caches*banks); //(banks > 1)? nextDomain() : (i*banks + j)*zinfo->numDomains/(caches*banks);
-            cg[i][j] = BuildCacheBank(config, prefix, bankName, bankSize, isTerminal, domain);
+            cg[i][j] = BuildCacheBank(config, prefix, bankName, bankSize, isTerminal, domain, isPrefetcher);
         }
     }
 

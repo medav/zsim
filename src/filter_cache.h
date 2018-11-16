@@ -51,6 +51,9 @@ class FilterCache : public Cache {
             void clear() {wrAddr = 0; rdAddr = 0; availCycle = 0;}
         };
 
+        bool isPrefetcher;
+        Counter profNumPrefetches;
+
         //Replicates the most accessed line of each set in the cache
         FilterEntry* filterArray;
         Address setMask;
@@ -63,7 +66,7 @@ class FilterCache : public Cache {
 
     public:
         FilterCache(uint32_t _numSets, uint32_t _numLines, CC* _cc, CacheArray* _array,
-                ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, g_string& _name)
+                ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, bool _isPrefetcher, g_string& _name)
             : Cache(_numLines, _cc, _array, _rp, _accLat, _invLat, _name)
         {
             numSets = _numSets;
@@ -74,6 +77,7 @@ class FilterCache : public Cache {
             fGETSHit = fGETXHit = 0;
             srcId = -1;
             reqFlags = 0;
+            isPrefetcher = _isPrefetcher;
         }
 
         void setSourceId(uint32_t id) {
@@ -95,20 +99,38 @@ class FilterCache : public Cache {
             cacheStat->append(fgetsStat);
             cacheStat->append(fgetxStat);
 
+            profNumPrefetches.init("numPf", "Total number of prefetch loads");
+            cacheStat->append(&profNumPrefetches);
+
             initCacheStats(cacheStat);
             parentStat->append(cacheStat);
         }
 
-        inline uint64_t load(Address vAddr, uint64_t curCycle) {
+        inline uint64_t load(Address vAddr, uint64_t curCycle, bool prefetch = false) {
             Address vLineAddr = vAddr >> lineBits;
             uint32_t idx = vLineAddr & setMask;
             uint64_t availCycle = filterArray[idx].availCycle; //read before, careful with ordering to avoid timing races
+            uint64_t respCycle = 0;
             if (vLineAddr == filterArray[idx].rdAddr) {
                 fGETSHit++;
-                return MAX(curCycle, availCycle);
+                respCycle = MAX(curCycle, availCycle);
             } else {
-                return replace(vLineAddr, idx, true, curCycle);
+                respCycle = replace(vLineAddr, idx, true, curCycle);
             }
+
+            if (isPrefetcher && !prefetch) {
+                return handlePrefetch(vLineAddr, respCycle);
+            }
+            else {
+                return respCycle;
+            }
+        }
+
+        uint64_t handlePrefetch(Address vLineAddr, uint64_t curCycle) {
+            // This implements a simple next sequential block prefetch on every load
+            Address pfAddr = (vLineAddr + 1) << lineBits;
+            profNumPrefetches.inc(1);
+            return load(pfAddr, curCycle, true);
         }
 
         inline uint64_t store(Address vAddr, uint64_t curCycle) {

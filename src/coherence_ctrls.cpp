@@ -340,4 +340,3 @@ uint64_t MESITopCC::processInval(Address lineAddr, uint32_t lineId, InvType type
         return sendInvalidates(lineAddr, lineId, type, reqWriteback, cycle, srcId);
     }
 }
-
