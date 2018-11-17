@@ -7,7 +7,6 @@ sys = {
     cores = {
         c = {
             cores = {num_cores};
-            type = "Timing";
             dcache = "l1d";
             icache = "l1i";
         };
@@ -20,6 +19,7 @@ sys = {
             caches = {num_cores};
             size = {l1d_size};
             latency = 4;
+            isPrefetcher = {prefetcher};
         };
 
         l1i = {
@@ -32,7 +32,6 @@ sys = {
             caches = {num_cores};
             size = {l2_size};
             children = "l1d|l1i";
-            type = "Timing";
         };
 
         l3 = {
@@ -40,7 +39,6 @@ sys = {
             size = {l3_size};
             latency = 27;
             children = "l2";
-            type = "Timing";
 
         };
     };

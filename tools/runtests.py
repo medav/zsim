@@ -14,17 +14,18 @@ template_filename = sys.argv[1]
 template = open(template_filename, 'r').read()
 
 params = {
-    'num_cores': [2], #[1, 2, 4, 8, 16, 32, 64, 128, 256],
+    'num_cores': [1, 2, 4, 8, 16, 32, 64, 128, 256],
     'l1i_size': [32 * 1024], # 32KB
     'l1d_size': [64 * 1024], # 64 KB
     'l2_size': [512 * 1024], # 512 KB
     'l3_size': [1024 * 1024], # 1 MB
     'peak_bw': [512], # [1, 8, 64, 512, 4096, 8 * 4096, 64 * 4096],
-    'mat_size': [128] # 16 M entries => 64MB matrix
+    'mat_size': [128], # 16 M entries => 64MB matrix
+    'prefetcher': ['false', 'true']
 }
 
 
-param_names = ['num_cores', 'l1i_size', 'l1d_size', 'l2_size', 'l3_size', 'peak_bw', 'mat_size']
+param_names = ['num_cores', 'l1i_size', 'l1d_size', 'l2_size', 'l3_size', 'peak_bw', 'mat_size', 'prefetcher']
 param_lists = list(itertools.product(*[params[key] for key in param_names]))
 
 stats = {
@@ -50,7 +51,9 @@ for param_list in param_lists:
         f.write(config_text)
 
     procs.append(subprocess.Popen(['zsim', 'config.cfg'], cwd=workdir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-    procs[-1].wait()
+
+for proc in procs:
+    proc.wait()
 
 
 print(', '.join(param_names + stat_names))
