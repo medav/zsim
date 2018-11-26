@@ -74,14 +74,14 @@ void StreamPrefetcher::initStats(AggregateStat * parentStat)
     parentStat->append(s);
 }
 
-uint64_t StreamPrefetcher::access(MemReq & req) 
+uint64_t StreamPrefetcher::access(MemReq & req)
 {
     uint64_t longerCycle, pfRespCycle, respCycle, reqCycle;
     uint32_t origChildId = req.childId;
 
     req.childId = childId;
     reqCycle = req.cycle;
-    
+
     if (req.type != GETS) {
         respCycle = parent->access(req);
         req.childId = origChildId;
@@ -101,7 +101,7 @@ uint64_t StreamPrefetcher::access(MemReq & req)
 
     longerCycle = pfRespCycle = respCycle = parent->access(req);
 
-    if (likely(evRec && evRec->hasRecord())) 
+    if (likely(evRec && evRec->hasRecord()))
         wbAcc = evRec->popRecord();
 
     Address pageAddr = req.lineAddr >> 6;
@@ -177,20 +177,32 @@ uint64_t StreamPrefetcher::access(MemReq & req)
 
                 if (prefetchPos < 64 && !e.valid[prefetchPos]) {
                     MESIState state = I;
-                    MemReq pfReq =
-                       { req.lineAddr + prefetchPos - pos, GETS, req.childId, &state, reqCycle, req.childLock,
-                            state, req.srcId, MemReq::PREFETCH
+                    MESIState req_state = *req.state;
+
+                    MemReq pfReq = {
+                        req.lineAddr + prefetchPos - pos,
+                        GETS,
+                        req.childId,
+                        &state,
+                        reqCycle,
+                        req.childLock,
+                        state,
+                        req.srcId,
+                        MemReq::PREFETCH,
+                        req.state
                     };
                     pfRespCycle = parent->access(pfReq);
                     longerCycle = (wbAcc.reqCycle > pfRespCycle) ? wbAcc.reqCycle : pfRespCycle;
-                    
+
+                    *req.state = req_state;
+
 					     e.valid[prefetchPos] = true;
                     e.times[prefetchPos].fill(reqCycle, longerCycle);
 
                     profPrefetches.inc();
 
                     newEv = new(evRec) StreamPrefetcherEvent(0, longerCycle, evRec);
-                    nla = { pfReq.lineAddr, 
+                    nla = { pfReq.lineAddr,
 								longerCycle, longerCycle, pfReq.type, newEv, newEv};
 
                     if (wbAcc.isValid())
@@ -248,7 +260,7 @@ uint64_t StreamPrefetcher::access(MemReq & req)
     e.lastLastPos = e.lastPos;
     e.lastPos = pos;
     }
-   
+
     if (wbAcc.isValid())
             evRec->pushRecord(wbAcc);
 
@@ -261,4 +273,3 @@ uint64_t StreamPrefetcher::access(MemReq & req)
 uint64_t StreamPrefetcher::invalidate(const InvReq& req) {
     return child->invalidate(req);
 }
-
