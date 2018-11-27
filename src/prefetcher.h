@@ -171,6 +171,7 @@ class StreamPrefetcher : public BaseCache {
             uint64_t lastCycle;  // updated on alloc and hit
             uint64_t ts;
 
+
             void alloc(uint64_t curCycle) {
                 stride = 1;
                 lastPos = 0;
@@ -181,6 +182,8 @@ class StreamPrefetcher : public BaseCache {
                 lastCycle = curCycle;
             }
         };
+
+        Address curBlock;
 
         uint64_t timestamp;  // for LRU
         uint32_t pfEntries; // define the size of the tag and array size;
@@ -204,7 +207,7 @@ class StreamPrefetcher : public BaseCache {
 
     public:
         explicit StreamPrefetcher(const g_string& _name, const int nlines, const uint32_t _nEntries) : 
-               timestamp(0), pfEntries(_nEntries), name(_name) {
+               curBlock(0), timestamp(0), pfEntries(_nEntries), name(_name) {
                createArray();
 		  }
 

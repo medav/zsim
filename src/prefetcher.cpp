@@ -78,111 +78,62 @@ uint64_t StreamPrefetcher::access(MemReq& req) {
 
     DBG("%s: 0x%lx page %lx pos %d", name.c_str(), req.lineAddr, pageAddr, pos);
 
-    if (idx == 16) {  // entry miss
-        uint32_t cand = 16;
-        uint64_t candScore = -1;
-        //uint64_t candScore = 0;
-        for (uint32_t i = 0; i < 16; i++) {
-            if (array[i].lastCycle > reqCycle + 500) continue;  // warm prefetches, not even a candidate
-            /*uint64_t score = (reqCycle - array[i].lastCycle)*(3 - array[i].conf.counter());
-            if (score > candScore) {
-                cand = i;
-                candScore = score;
-            }*/
-            if (array[i].ts < candScore) {  // just LRU
-                cand = i;
-                candScore = array[i].ts;
-            }
-        }
+    MESIState req_state = *req.state;
 
-        if (cand < 16) {
-            idx = cand;
-            array[idx].alloc(reqCycle);
-            array[idx].lastPos = pos;
-            array[idx].ts = timestamp++;
-            tag[idx] = pageAddr;
-        }
-        DBG("%s: MISS alloc idx %d", name.c_str(), idx);
-    } else {  // entry hit
-        profPageHits.inc();
-        Entry& e = array[idx];
-        array[idx].ts = timestamp++;
-        DBG("%s: PAGE HIT idx %d", name.c_str(), idx);
+    auto block = req.lineAddr & ~0x3F;
 
-        // 1. Did we prefetch-hit?
-        bool shortPrefetch = false;
-        if (e.valid[pos]) {
-            uint64_t pfRespCycle = e.times[pos].respCycle;
-            //shortPrefetch = pfRespCycle > respCycle;
-            e.valid[pos] = false;  // close, will help with long-lived transactions
-            respCycle = MAX(pfRespCycle, 0);
-            e.lastCycle = MAX(respCycle, e.lastCycle);
-            profHits.inc();
-            //if (shortPrefetch) profShortHits.inc();
-            DBG("%s: pos %d prefetched on %ld, pf resp %ld, demand resp %ld, short %d", name.c_str(), pos, e.times[pos].startCycle, pfRespCycle, respCycle, shortPrefetch);
-        }
-
-        // 2. Update predictors, issue prefetches
-        int32_t stride = pos - e.lastPos;
-        DBG("%s: pos %d lastPos %d lastLastPost %d e.stride %d", name.c_str(), pos, e.lastPos, e.lastLastPos, e.stride);
-        if (e.stride == stride) {
-            e.conf.inc();
-            if (e.conf.pred()) {  // do prefetches
-                int32_t fetchDepth = (e.lastPrefetchPos - e.lastPos)/stride;
-                uint32_t prefetchPos = e.lastPrefetchPos + stride;
-                if (fetchDepth < 1) {
-                    prefetchPos = pos + stride;
-                    fetchDepth = 1;
-                }
-                DBG("%s: pos %d stride %d conf %d lastPrefetchPos %d prefetchPos %d fetchDepth %d", name.c_str(), pos, stride, e.conf.counter(), e.lastPrefetchPos, prefetchPos, fetchDepth);
-
-                if (prefetchPos < 64 && !e.valid[prefetchPos]) {
-                    MESIState state = I;
-                    MemReq pfReq = {req.lineAddr + prefetchPos - pos, GETS, req.childId, &state, reqCycle, req.childLock, state, req.srcId, MemReq::PREFETCH};
-                    uint64_t pfRespCycle = parent->access(pfReq);  // FIXME, might segfault
-                    e.valid[prefetchPos] = true;
-                    e.times[prefetchPos].fill(reqCycle, pfRespCycle);
-                    profPrefetches.inc();
-
-                    if (shortPrefetch && fetchDepth < 8 && prefetchPos + stride < 64 && !e.valid[prefetchPos + stride]) {
-                        prefetchPos += stride;
-                        pfReq.lineAddr += stride;
-                        pfRespCycle = parent->access(pfReq);
-                        e.valid[prefetchPos] = true;
-                        e.times[prefetchPos].fill(reqCycle, pfRespCycle);
-                        profPrefetches.inc();
-                        profDoublePrefetches.inc();
-                    }
-                    e.lastPrefetchPos = prefetchPos;
-                    assert(state == I);  // prefetch access should not give us any permissions
-                }
-            } else {
-                profLowConfAccs.inc();
-            }
-        } else {
-            e.conf.dec();
-            // See if we need to switch strides
-            if (!e.conf.pred()) {
-                int32_t lastStride = e.lastPos - e.lastLastPos;
-
-                if (stride && stride != e.stride && stride == lastStride) {
-                    e.conf.reset();
-                    e.stride = stride;
-                    profStrideSwitches.inc();
-                }
-            }
-            e.lastPrefetchPos = pos;
-        }
-
-        e.lastLastPos = e.lastPos;
-        e.lastPos = pos;
+    if (block == curBlock) {
+        return respCycle;
     }
 
-    uint64_t demand_resp = parent->access(req);
-    respCycle = MAX(respCycle, demand_resp);
+    curBlock = block;
 
-    req.childId = origChildId;
+    for (uint32_t i = 0; i < 64; i++) {
+    MESIState state = I;
+
+    auto lineAddr = curBlock + i; 
+
+    if (lineAddr == req.lineAddr) continue;
+
+    MemReq pfReq = {
+        lineAddr,
+        GETS,
+        req.childId,
+        &state,
+        reqCycle,
+        req.childLock,
+        state,
+        req.srcId,
+        MemReq::PREFETCH
+    };
+
+    pfRespCycle = parent->access(pfReq);
+    respCycle = (respCycle > pfRespCycle) ? respCycle : pfRespCycle;
+
+    }
+
+
+    profPrefetches.inc();
+
+
+    uint64_t demand_resp = parent->access(req);
+    respCycle = MAX(respCycle, demand_resp);    
+
+    //newEv = new(evRec) StreamPrefetcherEvent(0, longerCycle, evRec);
+    //nla = { pfReq.lineAddr, longerCycle, longerCycle, pfReq.type, newEv, newEv};
+
+    //if (wbAcc.isValid())
+    //        newEv->setAccessRecord(wbAcc, pfReq.cycle);
+
+    //if (evRec && evRec->hasRecord()) {
+    //        FirstFetchRecord = evRec->popRecord();
+    //        newEv->setNextFetchRecord(FirstFetchRecord, pfReq.cycle);
+    //}
+
+    //evRec->pushRecord(nla);
+    //req.childId = origChildId;
     return respCycle;
+
 }
 
 // nop for now; do we need to invalidate our own state?
