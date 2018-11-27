@@ -36,6 +36,10 @@ print("Simulation Runs started at "+time_format)
 run_dir = 'tests/' + time_format
 os.mkdir(run_dir)
 
+if (sys.argv[2]):
+    with open(run_dir+'/notes.txt','w') as f:
+        f.write(sys.argv[2])
+
 procs = []
 
 with open(run_dir+'/run_details.txt','w') as f:
@@ -53,8 +57,8 @@ with open(run_dir+'/run_details.txt','w') as f:
         procs.append(subprocess.Popen(['zsim', 'config.cfg'], cwd=workdir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
         procs[-1].wait()
 
-for proc in procs:
-    proc.wait()
+#for proc in procs:
+#    proc.wait()
 
 #p = str(procs[0].stdout.readlines())
 #print('p is ', p)
