@@ -177,6 +177,7 @@ uint64_t StreamPrefetcher::access(MemReq & req)
                 DBG("%s: pos %d stride %d conf %d lastPrefetchPos %d prefetchPos %d fetchDepth %d", name.c_str(), pos, stride, e.conf.counter(), e.lastPrefetchPos, prefetchPos, fetchDepth);
 
                 if (prefetchPos < 64 && !e.valid[prefetchPos]) {
+                    DBG("ISSUING PREFETCH");
                     MESIState state = I;
                     MESIState req_state = *req.state;
                     std::cout<<reqCycle<<"\t"<<req.lineAddr<<"\t"<<prefetchPos<<"\t"<<pos<<req.srcId<<"\t"<<req.childId<<"\n";
@@ -242,6 +243,7 @@ uint64_t StreamPrefetcher::access(MemReq & req)
             } else {
                 profLowConfAccs.inc();
             }
+            
         } else {
             e.conf.dec();
             // See if we need to switch strides
