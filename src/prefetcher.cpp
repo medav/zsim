@@ -179,7 +179,7 @@ uint64_t StreamPrefetcher::access(MemReq & req)
                 if (prefetchPos < 64 && !e.valid[prefetchPos]) {
                     MESIState state = I;
                     MESIState req_state = *req.state;
-
+                    std::cout<<reqCycle<<"\t"<<req.lineAddr<<"\t"<<prefetchPos<<"\t"<<pos<<req.srcId<<"\t"<<req.childId<<"\n";
                     MemReq pfReq = {
                         req.lineAddr + prefetchPos - pos,
                         GETS,
@@ -196,7 +196,7 @@ uint64_t StreamPrefetcher::access(MemReq & req)
 
                     *req.state = req_state;
 
-					     e.valid[prefetchPos] = true;
+					e.valid[prefetchPos] = true;
                     e.times[prefetchPos].fill(reqCycle, longerCycle);
 
                     profPrefetches.inc();
