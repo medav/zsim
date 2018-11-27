@@ -61,5 +61,5 @@ sim = {
 
 process0 = {
     command = "naive-matmul {num_cores} {mat_size}";
-    startFastForwarded = False;
+    startFastForwarded = True;
 };
