@@ -188,8 +188,7 @@ uint64_t StreamPrefetcher::access(MemReq & req)
                         req.childLock,
                         state,
                         req.srcId,
-                        MemReq::PREFETCH,
-                        req.state
+                        MemReq::PREFETCH
                     };
                     pfRespCycle = parent->access(pfReq);
                     longerCycle = (wbAcc.reqCycle > pfRespCycle) ? wbAcc.reqCycle : pfRespCycle;

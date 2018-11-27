@@ -43,7 +43,7 @@ sys = {
         }
 
         l2 = {
-            type="Simple";
+            type="Timing";
             array = {
                 type = "SetAssoc";
                 ways = 8;
@@ -63,7 +63,7 @@ sys = {
             size = {l3_size};
             latency = 27;
             children = "l2";
-            type = "Simple";
+            type = "Timing";
         };
     };
 
