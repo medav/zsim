@@ -23,6 +23,7 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <iostream>
 #include "bithacks.h"
 #include "event_recorder.h"
 #include "prefetcher.h"
@@ -165,7 +166,7 @@ uint64_t StreamPrefetcher::access(MemReq & req)
         int32_t stride = pos - e.lastPos;
         DBG("%s: pos %d lastPos %d lastLastPost %d e.stride %d", name.c_str(), pos, e.lastPos, e.lastLastPos, e.stride);
         if (e.stride == stride) {
-            e.conf.inc();
+            //e.conf.inc();
             if (e.conf.pred()) {  // do prefetches
                 int32_t fetchDepth = (e.lastPrefetchPos - e.lastPos)/stride;
                 uint32_t prefetchPos = e.lastPrefetchPos + stride;
