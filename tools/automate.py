@@ -20,7 +20,7 @@ params = {
     'l1d_size': [64 * 1024], # 64 KB
     'l2_size': [512 * 1024], # 512 KB
     'l3_size': [1024 * 1024], # 1 MB
-    'peak_bw': [1024, 4 * 1024, 16 * 1024, 64 * 1024, 256 * 1024],
+    'peak_bw': [16 * 1024], #[1024, 4 * 1024, 16 * 1024, 64 * 1024, 256 * 1024],
     'mat_size': [128] # 16 M entries => 64MB matrix
 }
 
@@ -51,7 +51,7 @@ with open(run_dir+'/run_details.txt','w') as f:
             config_f.write(config_text)
 
         procs.append(subprocess.Popen(['zsim', 'config.cfg'], cwd=workdir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-        #procs[-1].wait()
+        procs[-1].wait()
 
 for proc in procs:
     proc.wait()
