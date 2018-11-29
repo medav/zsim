@@ -28,6 +28,8 @@
 #include "timing_event.h"
 #include "zsim.h"
 
+#define DBG(args...) info(args)
+
 // Events
 class HitEvent : public TimingEvent {
     private:
@@ -112,6 +114,8 @@ void TimingCache::initStats(AggregateStat* parentStat) {
 
 // TODO(dsm): This is copied verbatim from Cache. We should split Cache into different methods, then call those.
 uint64_t TimingCache::access(MemReq& req) {
+    if(req.flags == 32) DBG("PREFETCH MEMORY REQUEST")
+
     EventRecorder* evRec = zinfo->eventRecorders[req.srcId];
     assert_msg(evRec, "TimingCache is not connected to TimingCore");
 
