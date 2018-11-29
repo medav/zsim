@@ -26,6 +26,7 @@
 #ifndef PREFETCHER_H_
 #define PREFETCHER_H_
 
+#include <iostream>
 #include <bitset>
 #include "bithacks.h"
 #include "g_std/g_string.h"
@@ -151,9 +152,6 @@ class SatCounter {
 class StreamPrefetcher : public BaseCache {
     private:
         struct Entry {
-            // Two competing strides; at most one active
-            int32_t stride;
-            SatCounter<3, 2, 1> conf;
 
             struct AccessTimes {
                 uint64_t startCycle;  // FIXME: Dead for now, we should use it for profiling
@@ -162,21 +160,14 @@ class StreamPrefetcher : public BaseCache {
                 void fill(uint32_t s, uint64_t r) { startCycle = s; respCycle = r; }
             };
 
-            AccessTimes times[64];
             std::bitset<64> valid;
 
-            uint32_t lastPos;
-            uint32_t lastLastPos;
             uint32_t lastPrefetchPos;
             uint64_t lastCycle;  // updated on alloc and hit
             uint64_t ts;
 
             void alloc(uint64_t curCycle) {
-                stride = 1;
-                lastPos = 0;
-                lastLastPos = 0;
                 lastPrefetchPos = 0;
-                conf.reset();
                 valid.reset();
                 lastCycle = curCycle;
             }
@@ -184,9 +175,13 @@ class StreamPrefetcher : public BaseCache {
 
         uint64_t timestamp;  // for LRU
         uint32_t pfEntries; // define the size of the tag and array size;
+		uint32_t pfWays;
 
-        Address *tag;
-        Entry *array;
+        Address **tag = gm_calloc<Address *>(pfWays); // vector of queues vector<queue<Address>> tag would have been better - but don't know how to allocate it
+        Entry **array = gm_calloc<Entry *>(pfWays); // vector of queues vector<queue<Entry>> address would have been better
+
+		uint32_t *queTop = gm_calloc<uint32_t>(pfWays);		// to keep a record of top and bottom of each Address and Entry Queue
+		uint32_t *queBottom = gm_calloc<uint32_t>(pfWays);
 
         Counter profAccesses, profPrefetches, profDoublePrefetches, profPageHits, profHits, profShortHits, profStrideSwitches, profLowConfAccs;
 
@@ -195,17 +190,24 @@ class StreamPrefetcher : public BaseCache {
         uint32_t childId;
         g_string name;
 
+		void resetQueuePointers(uint8_t i){ queTop[i] = queBottom[i] = 0;}	
+
 	    void createArray( void ){ 
             //tag = (Address *) malloc (sizeof(Address) * pfEntries);
             //array = (Entry *) malloc (sizeof(Entry) * pfEntries);
-            tag = gm_calloc<Address>(pfEntries);
-            array = gm_calloc<Entry>(pfEntries);
+			for(uint32_t i=0; i<pfWays; i++){
+            	tag[i] = gm_calloc<Address>(pfEntries);
+            	array[i] = gm_calloc<Entry>(pfEntries);
+			}
         }
 
     public:
-        explicit StreamPrefetcher(const g_string& _name, const int nlines, const uint32_t _nEntries) : 
-               timestamp(0), pfEntries(_nEntries), name(_name) {
-               createArray();
+        explicit StreamPrefetcher(const g_string& _name, const int nlines, const uint32_t _nEntries, const uint32_t _nWays) : 
+               timestamp(0), pfEntries(_nEntries), name(_name), pfWays(_nWays) {
+               createArray();	  
+				for(uint8_t i=0; i<pfWays; i++){
+					resetQueuePointers(i); // reset all queue pointers
+				}				   
 		  }
 
         ~StreamPrefetcher ( void ) {

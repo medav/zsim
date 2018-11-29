@@ -391,6 +391,7 @@ CacheGroup* BuildCacheGroup(Config& config, const string& name, bool isTerminal)
     if (isPrefetcher) { //build a prefetcher group
         uint32_t prefetchers = config.get<uint32_t>(prefix + "prefetchers", 1);
         uint32_t entrySize = config.get<uint32_t>(prefix + "entries", 16);
+        uint32_t ways = config.get<uint32_t>(prefix + "ways",4);
         assert(entrySize > 0);
         cg.resize(prefetchers);
         for (vector<BaseCache*>& bg : cg) bg.resize(1);
@@ -398,7 +399,7 @@ CacheGroup* BuildCacheGroup(Config& config, const string& name, bool isTerminal)
             stringstream ss;
             ss << name << "-" << i;
             g_string pfName(ss.str().c_str());
-            cg[i][0] = new StreamPrefetcher(pfName, bankSize/zinfo->lineSize, entrySize);
+            cg[i][0] = new StreamPrefetcher(pfName, bankSize/zinfo->lineSize, entrySize, ways);
         }
         return cgp;
     }

@@ -23,7 +23,6 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <iostream>
 #include "bithacks.h"
 #include "event_recorder.h"
 #include "prefetcher.h"
@@ -79,6 +78,7 @@ uint64_t StreamPrefetcher::access(MemReq & req)
 {
     uint64_t longerCycle, pfRespCycle, respCycle, reqCycle;
     uint32_t origChildId = req.childId;
+    int32_t fetchDepth;
 
     req.childId = childId;
     reqCycle = req.cycle;
@@ -102,21 +102,96 @@ uint64_t StreamPrefetcher::access(MemReq & req)
 
     longerCycle = pfRespCycle = respCycle = parent->access(req);
 
-    if (likely(evRec && evRec->hasRecord()))
+    if (likely(evRec && evRec->hasRecord())){
         wbAcc = evRec->popRecord();
+    }
 
     Address pageAddr = req.lineAddr >> 6;
     uint32_t pos = req.lineAddr & (64-1);
-    uint32_t idx = 16;
+    uint32_t idx = pfWays;
 
-
+    DBG("lineAddr %016X",req.lineAddr)
     // This loop gets unrolled and there are no control dependences. Way faster than a break (but should watch for the avoidable loop-carried dep)
-    for (uint32_t i = 0; i < 16; i++) {
-        bool match = (pageAddr == tag[i]);
+    for (uint32_t i = 0; i < pfWays; i++) { 
+        bool match = (pageAddr == tag[i][queTop[i]]); 
         idx = match?  i : idx;  // ccmov, no branch
+        DBG("idx %d pageAddr %016X tag[%d][%d] %016X",idx,pageAddr,i,queTop[i],tag[i][queTop[i]])
     }
 
-    DBG("%s: 0x%lx page %lx pos %d", name.c_str(), req.lineAddr, pageAddr, pos);
+    if (idx == pfWays) {  // entry miss
+        uint32_t cand = pfWays;
+        uint64_t candScore = -1;
+        // check the head of each buffer
+        for (uint32_t i = 0; i < pfWays; i++) {
+            if (array[i][queTop[i]].lastCycle > reqCycle + 500) continue;  // warm prefetches, not even a candidate
+            if (array[i][queTop[i]].ts < candScore) {  // just LRU
+                cand = i;
+                candScore = array[i][queTop[i]].ts;
+            }
+        }
+
+        if (cand < pfWays) {
+            idx = cand;
+            // reset queue pointers
+            resetQueuePointers(idx);
+
+            array[idx][queTop[idx]].alloc(reqCycle);
+            array[idx][queTop[idx]].ts = timestamp++;
+            tag[idx][queTop[idx]] = pageAddr + 1; // The top entry for prefetch becomes the subsequent line after Miss. 
+            //start demand access on Miss
+
+            MESIState state = I;
+            MESIState req_state = *req.state;
+            uint64_t nextLineAddr = (pageAddr+1) << 6;
+
+            MemReq pfReq = {
+                nextLineAddr,
+                GETS,
+                req.childId,
+                &state,
+                reqCycle,
+                req.childLock,
+                state,
+                req.srcId,
+                MemReq::PREFETCH
+            };
+            pfRespCycle = parent->access(pfReq); // update the access for next address
+            DBG("pageAddr %016X lineAddr %016X pos %d pfRespCycle %d queBottom[idx] %d",tag[idx][queBottom[idx]],nextLineAddr,pos,pfRespCycle,queBottom[idx])
+            queBottom[idx]++;       // adding an entry to the designated buffer
+        }
+        DBG("%s: MISS alloc idx %d", name.c_str(), idx);
+    } else { // prefetch Hit
+        profPageHits.inc();
+        queTop[idx]++;          // increments the head of the queue on a Hit
+        DBG("%s: PAGE HIT idx %d Pointer %d", name.c_str(), idx, queTop[idx]);
+
+        // fetch two blocks now
+        for (uint8_t i=0; i<2; i++){
+            tag[idx][queBottom[idx]] = pageAddr + 1; // The top entry for prefetch becomes the subsequent line after Miss. 
+            array[idx][queBottom[idx]].ts = timestamp++; // Incrementing Time Stamps
+
+            MESIState state = I;
+            MESIState req_state = *req.state;
+            uint64_t nextLineAddr = (pageAddr+1) << 6;
+
+            MemReq pfReq = {
+                nextLineAddr,
+                GETS,
+                req.childId,
+                &state,
+                reqCycle,
+                req.childLock,
+                state,
+                req.srcId,
+                MemReq::PREFETCH
+            };
+            pfRespCycle = parent->access(pfReq); // update the access for next address
+            DBG("pageAddr %016X lineAddr %016X pos %d pfRespCycle %d queBottom[idx] %d",tag[idx][queBottom[idx]],nextLineAddr,req.childId,req.srcId,pos,pfRespCycle,queBottom[idx])
+            queBottom[idx]++;       // adding an entry to the designated buffer
+        }
+    }
+
+ /*   DBG("%s: 0x%lx page %lx pos %d", name.c_str(), req.lineAddr, pageAddr, pos);
 
     if (idx == 16) {  // entry miss
         uint32_t cand = 16;
@@ -124,11 +199,11 @@ uint64_t StreamPrefetcher::access(MemReq & req)
         //uint64_t candScore = 0;
         for (uint32_t i = 0; i < 16; i++) {
             if (array[i].lastCycle > reqCycle + 500) continue;  // warm prefetches, not even a candidate
-            /*uint64_t score = (reqCycle - array[i].lastCycle)*(3 - array[i].conf.counter());
-            if (score > candScore) {
-                cand = i;
-                candScore = score;
-            }*/
+            //uint64_t score = (reqCycle - array[i].lastCycle)*(3 - array[i].conf.counter());
+            //if (score > candScore) {
+            //    cand = i;
+            //    candScore = score;
+            //}
             if (array[i].ts < candScore) {  // just LRU
                 cand = i;
                 candScore = array[i].ts;
@@ -138,7 +213,7 @@ uint64_t StreamPrefetcher::access(MemReq & req)
         if (cand < 16) {
             idx = cand;
             array[idx].alloc(reqCycle);
-            array[idx].lastPos = pos;
+            array[idx].lastPos = 0; // top of the prefetch buffer
             array[idx].ts = timestamp++;
             tag[idx] = pageAddr;
         }
@@ -166,9 +241,9 @@ uint64_t StreamPrefetcher::access(MemReq & req)
         int32_t stride = pos - e.lastPos;
         DBG("%s: pos %d lastPos %d lastLastPost %d e.stride %d", name.c_str(), pos, e.lastPos, e.lastLastPos, e.stride);
         if (e.stride == stride) {
-            //e.conf.inc();
+            e.conf.inc();
             if (e.conf.pred()) {  // do prefetches
-                int32_t fetchDepth = (e.lastPrefetchPos - e.lastPos)/stride;
+                fetchDepth = (e.lastPrefetchPos - e.lastPos)/stride;
                 uint32_t prefetchPos = e.lastPrefetchPos + stride;
                 if (fetchDepth < 1) {
                     prefetchPos = pos + stride;
@@ -177,10 +252,9 @@ uint64_t StreamPrefetcher::access(MemReq & req)
                 DBG("%s: pos %d stride %d conf %d lastPrefetchPos %d prefetchPos %d fetchDepth %d", name.c_str(), pos, stride, e.conf.counter(), e.lastPrefetchPos, prefetchPos, fetchDepth);
 
                 if (prefetchPos < 64 && !e.valid[prefetchPos]) {
-                    DBG("ISSUING PREFETCH");
                     MESIState state = I;
                     MESIState req_state = *req.state;
-                    std::cout<<reqCycle<<"\t"<<req.lineAddr<<"\t"<<prefetchPos<<"\t"<<pos<<req.srcId<<"\t"<<req.childId<<"\n";
+
                     MemReq pfReq = {
                         req.lineAddr + prefetchPos - pos,
                         GETS,
@@ -192,12 +266,13 @@ uint64_t StreamPrefetcher::access(MemReq & req)
                         req.srcId,
                         MemReq::PREFETCH
                     };
+                    DBG("%016X lineAddr %d childId %d srcId %d prefetchPos %d pos",req.lineAddr,req.childId,req.srcId,prefetchPos,pos)
                     pfRespCycle = parent->access(pfReq);
                     longerCycle = (wbAcc.reqCycle > pfRespCycle) ? wbAcc.reqCycle : pfRespCycle;
 
                     *req.state = req_state;
 
-					e.valid[prefetchPos] = true;
+					     e.valid[prefetchPos] = true;
                     e.times[prefetchPos].fill(reqCycle, longerCycle);
 
                     profPrefetches.inc();
@@ -243,7 +318,6 @@ uint64_t StreamPrefetcher::access(MemReq & req)
             } else {
                 profLowConfAccs.inc();
             }
-            
         } else {
             e.conf.dec();
             // See if we need to switch strides
@@ -261,10 +335,11 @@ uint64_t StreamPrefetcher::access(MemReq & req)
 
     e.lastLastPos = e.lastPos;
     e.lastPos = pos;
-    }
+    }*/
 
-    if (wbAcc.isValid())
-            evRec->pushRecord(wbAcc);
+    // since this was updated in the processAccess call
+    //if (wbAcc.isValid())
+    //        evRec->pushRecord(wbAcc);
 
     req.childId = origChildId;
 
