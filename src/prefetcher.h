@@ -182,6 +182,7 @@ class StreamPrefetcher : public BaseCache {
 
 		uint32_t *queTop = gm_calloc<uint32_t>(pfWays);		// to keep a record of top and bottom of each Address and Entry Queue
 		uint32_t *queBottom = gm_calloc<uint32_t>(pfWays);
+		uint32_t *numHits = gm_calloc<uint32_t>(pfWays);
 
         Counter profAccesses, profPrefetches, profDoublePrefetches, profPageHits, profHits, profShortHits, profStrideSwitches, profLowConfAccs;
 
@@ -190,7 +191,7 @@ class StreamPrefetcher : public BaseCache {
         uint32_t childId;
         g_string name;
 
-		void resetQueuePointers(uint8_t i){ queTop[i] = queBottom[i] = 0;}	
+		void resetQueuePointers(uint8_t i){ queTop[i] = queBottom[i] = numHits[i] = 0;}	
 
 	    void createArray( void ){ 
             //tag = (Address *) malloc (sizeof(Address) * pfEntries);
@@ -212,7 +213,11 @@ class StreamPrefetcher : public BaseCache {
 
         ~StreamPrefetcher ( void ) {
             gm_free(tag);
-            gm_free(array);    
+            gm_free(array);
+
+			gm_free(queTop);
+			gm_free(queBottom);
+			gm_free(numHits);    
         }
 
         void initStats(AggregateStat* parentStat);
