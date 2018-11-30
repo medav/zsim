@@ -28,6 +28,7 @@
 #include "prefetcher.h"
 #include "timing_event.h"
 #include "zsim.h"
+#include "math.h"
 
 #define DBG(args...) info(args)
 //#define DBG(args...)
@@ -156,39 +157,47 @@ uint64_t StreamPrefetcher::access(MemReq & req)
                 MemReq::PREFETCH
             };
             pfRespCycle = parent->access(pfReq); // update the access for next address
-            DBG("pageAddr %016X lineAddr %016X pos %d pfRespCycle %d queBottom[idx] %d",tag[idx][queBottom[idx]],nextLineAddr,pos,pfRespCycle,queBottom[idx])
-            queBottom[idx]++;       // adding an entry to the designated buffer
+            DBG("MISSSS pageAddr %016X lineAddr %016X pfRespCycle %d queBottom[idx] %d",tag[idx][queBottom[idx]],nextLineAddr,pfRespCycle,queBottom[idx])
+            queBottom[idx]++;       // points to the next available slot
         }
         DBG("%s: MISS alloc idx %d", name.c_str(), idx);
     } else { // prefetch Hit
-        profPageHits.inc();
-        queTop[idx]++;          // increments the head of the queue on a Hit
-        DBG("%s: PAGE HIT idx %d Pointer %d", name.c_str(), idx, queTop[idx]);
+        profPageHits.inc();  
+        numHits[idx]++;         // could be removed            
+        // incremental prefetches
+        uint32_t entriesOccupied = (queBottom[idx] > queTop[idx]) ? queBottom[idx]-queTop[idx] : queTop[idx]-queBottom[idx];
+        DBG("Entries Occupied %d",entriesOccupied);
+        uint32_t numPrefetchers = (pow(2,numHits[idx]) > (pfEntries-entriesOccupied)) ? (pfEntries-entriesOccupied) : pow(2,numHits[idx]);
+        //std::cout<<"space in Queue "<<pfEntries-(queBottom[idx]-queTop[idx])<<" power "<<pow(2,numHits[idx])<<" numPrefetches "<<numPrefetchers<<"\n";
+        DBG("%s: PAGE HIT idx %d Top Pointer %d numHits[%d] %d numPrefetchers %d", name.c_str(), idx, queTop[idx], idx, numHits[idx], numPrefetchers); //);
 
-        // fetch two blocks now
-        for (uint8_t i=0; i<2; i++){
-            tag[idx][queBottom[idx]] = pageAddr + 1; // The top entry for prefetch becomes the subsequent line after Miss. 
-            array[idx][queBottom[idx]].ts = timestamp++; // Incrementing Time Stamps
+        for (uint8_t i=0; i<numPrefetchers; i++){
+            if( queBottom[idx] != queTop[idx]) {
+                pageAddr++;
+                tag[idx][queBottom[idx]] = pageAddr; // The top entry for prefetch becomes the subsequent line after Miss. 
+                array[idx][queBottom[idx]].ts = timestamp++; // Incrementing Time Stamps
 
-            MESIState state = I;
-            MESIState req_state = *req.state;
-            uint64_t nextLineAddr = (pageAddr+1) << 6;
+                MESIState state = I;
+                MESIState req_state = *req.state;
+                uint64_t nextLineAddr = pageAddr << 6;
 
-            MemReq pfReq = {
-                nextLineAddr,
-                GETS,
-                req.childId,
-                &state,
-                reqCycle,
-                req.childLock,
-                state,
-                req.srcId,
-                MemReq::PREFETCH
-            };
-            pfRespCycle = parent->access(pfReq); // update the access for next address
-            DBG("pageAddr %016X lineAddr %016X pos %d pfRespCycle %d queBottom[idx] %d",tag[idx][queBottom[idx]],nextLineAddr,req.childId,req.srcId,pos,pfRespCycle,queBottom[idx])
-            queBottom[idx]++;       // adding an entry to the designated buffer
+                MemReq pfReq = {
+                    nextLineAddr,
+                    GETS,
+                    req.childId,
+                    &state,
+                    reqCycle,
+                    req.childLock,
+                    state,
+                    req.srcId,
+                    MemReq::PREFETCH
+                };
+                pfRespCycle = parent->access(pfReq); // update the access for next address
+                DBG("pageAddr %016X lineAddr %016X pfRespCycle %d queBottom[idx] %d",tag[idx][queBottom[idx]],nextLineAddr,pfRespCycle,queBottom[idx])
+                queBottom[idx] = (queBottom[idx] > pfEntries-1) ? 0 : queBottom[idx] + 1;       // adding an entry to the designated buffer
+            }
         }
+        queTop[idx]++;          // increments the head of the queue on a Hit  
     }
 
  /*   DBG("%s: 0x%lx page %lx pos %d", name.c_str(), req.lineAddr, pageAddr, pos);
