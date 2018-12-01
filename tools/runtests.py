@@ -15,11 +15,11 @@ outdir = sys.argv[1]
 template = open(template_filename, 'r').read()
 
 params = {
-    'num_cores': [1, 2, 4, 8, 16, 32, 64, 96, 128, 196, 256],
-    'l1i_size': [2 * 1024], # 32KB
-    'l1d_size': [2 * 1024], # 64 KB
-    'l2_size': [4 * 1024], # 512 KB
-    'l3_size': [8 * 1024], # 1 MB
+    'num_cores': [1, 2, 4, 8, 12, 16, 24, 32, 64, 96, 128, 196, 256],
+    'l1i_size': [32 * 1024], # 32KB
+    'l1d_size': [64 * 1024], # 64 KB
+    'l2_size': [512 * 1024], # 512 KB
+    'l3_size': [1024 * 1024], # 1 MB
     'peak_bw': [4],
     'mat_size': [64] # 16 M entries => 64MB matrix
 }
@@ -40,6 +40,8 @@ if not os.path.exists(outdir):
 
 procs = []
 
+print(', '.join(param_names + stat_names))
+
 for param_list in param_lists:
     uname = 'test_' + '_'.join([str(param) for param in param_list])
     workdir = outdir + '/' + uname
@@ -50,11 +52,9 @@ for param_list in param_lists:
         f.write(config_text)
 
     procs.append(subprocess.Popen(['zsim', 'config.cfg'], cwd=workdir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-    print(uname)
     procs[-1].wait()
 
-print(', '.join(param_names + stat_names))
-for param_list in param_lists:
+# for param_list in param_lists:
     uname = 'test_' + '_'.join([str(param) for param in param_list])
     workdir = outdir + '/' + uname
     logout = workdir + '/zsim.out'
