@@ -160,8 +160,8 @@ class StreamPrefetcher : public BaseCache {
                 void fill(uint32_t s, uint64_t r) { startCycle = s; respCycle = r; }
             };
 
+			AccessTimes time;
             std::bitset<64> valid;
-
             uint32_t lastPrefetchPos;
             uint64_t lastCycle;  // updated on alloc and hit
             uint64_t ts;
