@@ -111,12 +111,10 @@ uint64_t StreamPrefetcher::access(MemReq & req)
     uint32_t pos = req.lineAddr & (64-1);
     uint32_t idx = pfWays;
 
-    //DBG("lineAddr %016X",req.lineAddr)
     // This loop gets unrolled and there are no control dependences. Way faster than a break (but should watch for the avoidable loop-carried dep)
     for (uint32_t i = 0; i < pfWays; i++) { 
         bool match = (pageAddr == tag[i][queTop[i]]); 
         idx = match?  i : idx;  // ccmov, no branch
-        //DBG("idx %d pageAddr %016X tag[%d][%d] %016X",idx,pageAddr,i,queTop[i],tag[i][queTop[i]])
     }
 
     if (idx == pfWays) {  // entry miss
@@ -157,17 +155,16 @@ uint64_t StreamPrefetcher::access(MemReq & req)
                 MemReq::PREFETCH
             };
             pfRespCycle = parent->access(pfReq); // update the access for next address
+	    *req.state = req_state;
             array[idx][queBottom[idx]].time.fill(respCycle,pfRespCycle);
             array[idx][queBottom[idx]].lastCycle = pfRespCycle;
             array[idx][queBottom[idx]].valid = true;
-            //DBG("MISSSS pageAddr %016X lineAddr %016X pfRespCycle %d queBottom[idx] %d",tag[idx][queBottom[idx]],nextLineAddr,pfRespCycle,queBottom[idx])
+
             queBottom[idx]++;       // points to the next available slot
         }
-        //DBG("%s: MISS alloc idx %d", name.c_str(), idx);
+        longerCycle = MAX(pfRespCycle,respCycle);
     } else { // prefetch Hit
-        if(array[idx][queTop[idx]].valid==true && (reqCycle > array[idx][queTop[idx]].time.respCycle)){ // check whether the prefetch data is valid or not
-            DBG("VALID PREFETCH HIT %d %d %d",idx,reqCycle,array[idx][queTop[idx]].time.respCycle)
-            //respCycle = array[idx][queTop[idx]].time.respCycle;
+    //    if(array[idx][queTop[idx]].valid==true && (reqCycle > array[idx][queTop[idx]].time.respCycle)){ // check whether the prefetch data is valid or not
             profPageHits.inc();  
             numHits[idx]++;         // could be removed            
             // incremental prefetches
@@ -196,13 +193,20 @@ uint64_t StreamPrefetcher::access(MemReq & req)
                         req.srcId,
                         MemReq::PREFETCH
                     };
-                    pfRespCycle = parent->access(pfReq); // update the access for next address
+                    pfRespCycle = parent->access(pfReq); // update the access for next addressi
+	            *req.state = req_state;
+        	    array[idx][queBottom[idx]].time.fill(reqCycle,pfRespCycle);
+	            array[idx][queBottom[idx]].lastCycle = pfRespCycle;
+        	    array[idx][queBottom[idx]].valid = true;
+		    
+		    reqCycle = pfRespCycle; // for next line start cycle
+
                     //DBG("pageAddr %016X lineAddr %016X pfRespCycle %d queBottom[idx] %d",tag[idx][queBottom[idx]],nextLineAddr,pfRespCycle,queBottom[idx])
                     queBottom[idx] = (queBottom[idx] > pfEntries-1) ? 0 : queBottom[idx] + 1;       // adding an entry to the designated buffer
                 }
             }
-            queTop[idx]++;          // increments the head of the queue on a Hit  
-        }else DBG("PREFETCH NOT READY %d %d %d",idx,reqCycle,array[idx][queTop[idx]].time.respCycle)
+	longerCycle = MAX(respCycle,pfRespCycle);    
+        queTop[idx]++;          // increments the head of the queue on a Hit  
     }
 
     // since this was updated in the processAccess call
@@ -211,7 +215,7 @@ uint64_t StreamPrefetcher::access(MemReq & req)
 
     req.childId = origChildId;
 
-    return respCycle;
+    return longerCycle;
 }
 
 // nop for now; do we need to invalidate our own state?
