@@ -200,17 +200,6 @@ uint64_t StreamPrefetcher::access(MemReq & req)
 
                     profPrefetches.inc();
 
-                    newEv = new(evRec) StreamPrefetcherEvent(0, longerCycle, evRec);
-                    nla = { pfReq.lineAddr,
-								longerCycle, longerCycle, pfReq.type, newEv, newEv};
-
-                    if (wbAcc.isValid())
-                         newEv->setAccessRecord(wbAcc, pfReq.cycle);
-
-                    if (evRec && evRec->hasRecord()) {
-                         FirstFetchRecord = evRec->popRecord();
-                         newEv->setNextFetchRecord(FirstFetchRecord, pfReq.cycle);
-                    }
 
                     if (shortPrefetch && fetchDepth < 8 && prefetchPos + stride < 64 && !e.valid[prefetchPos + stride]) {
                         prefetchPos += stride;
@@ -228,13 +217,11 @@ uint64_t StreamPrefetcher::access(MemReq & req)
                         if (likely(evRec && evRec->hasRecord())) {
                             info("[%s] PFL the transaction had generated a wb event!", name.c_str());
                             SecondFetchRecord = evRec->popRecord();
-                            newEv->setStrideFetchRecord(SecondFetchRecord, pfReq.cycle);
                         }
                     }
                     e.lastPrefetchPos = prefetchPos;
                     assert(state == I);  // prefetch access should not give us any permissions
 
-                    evRec->pushRecord(nla);
                     req.childId = origChildId;
                     return longerCycle;
                 }
