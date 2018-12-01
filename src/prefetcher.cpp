@@ -111,12 +111,12 @@ uint64_t StreamPrefetcher::access(MemReq & req)
     uint32_t pos = req.lineAddr & (64-1);
     uint32_t idx = pfWays;
 
-    DBG("lineAddr %016X",req.lineAddr)
+    //DBG("lineAddr %016X",req.lineAddr)
     // This loop gets unrolled and there are no control dependences. Way faster than a break (but should watch for the avoidable loop-carried dep)
     for (uint32_t i = 0; i < pfWays; i++) { 
         bool match = (pageAddr == tag[i][queTop[i]]); 
         idx = match?  i : idx;  // ccmov, no branch
-        DBG("idx %d pageAddr %016X tag[%d][%d] %016X",idx,pageAddr,i,queTop[i],tag[i][queTop[i]])
+        //DBG("idx %d pageAddr %016X tag[%d][%d] %016X",idx,pageAddr,i,queTop[i],tag[i][queTop[i]])
     }
 
     if (idx == pfWays) {  // entry miss
@@ -157,19 +157,19 @@ uint64_t StreamPrefetcher::access(MemReq & req)
                 MemReq::PREFETCH
             };
             pfRespCycle = parent->access(pfReq); // update the access for next address
-            DBG("MISSSS pageAddr %016X lineAddr %016X pfRespCycle %d queBottom[idx] %d",tag[idx][queBottom[idx]],nextLineAddr,pfRespCycle,queBottom[idx])
+            //DBG("MISSSS pageAddr %016X lineAddr %016X pfRespCycle %d queBottom[idx] %d",tag[idx][queBottom[idx]],nextLineAddr,pfRespCycle,queBottom[idx])
             queBottom[idx]++;       // points to the next available slot
         }
-        DBG("%s: MISS alloc idx %d", name.c_str(), idx);
+        //DBG("%s: MISS alloc idx %d", name.c_str(), idx);
     } else { // prefetch Hit
         profPageHits.inc();  
         numHits[idx]++;         // could be removed            
         // incremental prefetches
         uint32_t entriesOccupied = (queBottom[idx] > queTop[idx]) ? queBottom[idx]-queTop[idx] : queTop[idx]-queBottom[idx];
-        DBG("Entries Occupied %d",entriesOccupied);
+        //DBG("Entries Occupied %d",entriesOccupied);
         uint32_t numPrefetchers = (pow(2,numHits[idx]) > (pfEntries-entriesOccupied)) ? (pfEntries-entriesOccupied) : pow(2,numHits[idx]);
         //std::cout<<"space in Queue "<<pfEntries-(queBottom[idx]-queTop[idx])<<" power "<<pow(2,numHits[idx])<<" numPrefetches "<<numPrefetchers<<"\n";
-        DBG("%s: PAGE HIT idx %d Top Pointer %d numHits[%d] %d numPrefetchers %d", name.c_str(), idx, queTop[idx], idx, numHits[idx], numPrefetchers); //);
+        //DBG("%s: PAGE HIT idx %d Top Pointer %d numHits[%d] %d numPrefetchers %d", name.c_str(), idx, queTop[idx], idx, numHits[idx], numPrefetchers); //);
 
         for (uint8_t i=0; i<numPrefetchers; i++){
             if( queBottom[idx] != queTop[idx]) {
@@ -193,7 +193,7 @@ uint64_t StreamPrefetcher::access(MemReq & req)
                     MemReq::PREFETCH
                 };
                 pfRespCycle = parent->access(pfReq); // update the access for next address
-                DBG("pageAddr %016X lineAddr %016X pfRespCycle %d queBottom[idx] %d",tag[idx][queBottom[idx]],nextLineAddr,pfRespCycle,queBottom[idx])
+                //DBG("pageAddr %016X lineAddr %016X pfRespCycle %d queBottom[idx] %d",tag[idx][queBottom[idx]],nextLineAddr,pfRespCycle,queBottom[idx])
                 queBottom[idx] = (queBottom[idx] > pfEntries-1) ? 0 : queBottom[idx] + 1;       // adding an entry to the designated buffer
             }
         }
