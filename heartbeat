@@ -1,9 +1,9 @@
 Running on: gaurav-pc
-Start time: Sat Dec  1 14:32:03 2018
-Heartbeat time: Sat Dec  1 14:32:06 2018
+Start time: Sun Dec  2 15:33:46 2018
+Heartbeat time: Sun Dec  2 15:34:04 2018
 Stats since start:
- 14783 phases
- 14783000 cycles
- 4927666 cycles/s
-Stats since last heartbeat (1543696326s):
- 0 cycles/s
+ 295890 phases
+ 295890000 cycles
+ 16438333 cycles/s
+Stats since last heartbeat (8s):
+ 12957125 cycles/s

@@ -154,8 +154,8 @@ uint64_t StreamPrefetcher::access(MemReq & req)
                 req.srcId,
                 MemReq::PREFETCH
             };
-            pfRespCycle = parent->access(pfReq); // update the access for next address
-	    *req.state = req_state;
+//            pfRespCycle = parent->access(pfReq); // update the access for next address
+	        *req.state = req_state;
             array[idx][queBottom[idx]].time.fill(respCycle,pfRespCycle);
             array[idx][queBottom[idx]].lastCycle = pfRespCycle;
             array[idx][queBottom[idx]].valid = true;
@@ -206,7 +206,7 @@ uint64_t StreamPrefetcher::access(MemReq & req)
                 }
             }
 	longerCycle = MAX(respCycle,pfRespCycle);    
-        queTop[idx]++;          // increments the head of the queue on a Hit  
+        queTop[idx]++;          // increments the head of the queue on a Hit  /
     }
 
     // since this was updated in the processAccess call
