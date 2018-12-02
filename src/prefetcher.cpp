@@ -206,7 +206,7 @@ uint64_t StreamPrefetcher::access(MemReq & req)
                 }
             }
 	longerCycle = MAX(respCycle,pfRespCycle);    
-        queTop[idx]++;          // increments the head of the queue on a Hit  /
+        queTop[idx]++;          // increments the head of the queue on a Hit  
     }
 
     // since this was updated in the processAccess call

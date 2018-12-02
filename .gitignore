@@ -1,6 +1,7 @@
 deps
 build
 tests
+tests-*
 .vscode
 *.h5
 *.out
