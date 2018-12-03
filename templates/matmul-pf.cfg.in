@@ -7,7 +7,7 @@ sys = {
     cores = {
         c = {
             cores = {num_cores};
-            type = "Simple";
+            type = "Timing";
             dcache = "l1d";
             icache = "l1i";
         };
@@ -53,7 +53,6 @@ sys = {
     frequency = 2270;
     mem = {
         type = "MD1";
-        controllers = 1;
         bandwidth = {peak_bw};
     };
 };
@@ -66,5 +65,5 @@ sim = {
 
 process0 = {
     command = "naive-matmul {num_cores} {mat_size}";
-    startFastForwarded = True;
+    startFastForwarded = False;
 };

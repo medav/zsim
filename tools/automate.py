@@ -15,13 +15,13 @@ template_filename = sys.argv[1]
 template = open(template_filename, 'r').read()
 
 params = {
-    'num_cores': [1, 2, 4, 8, 16, 32, 64, 128, 256],
+    'num_cores': [1, 2, 4, 8, 16, 32, 64, 128, 256], #,512],
     'l1i_size': [32 * 1024], # 32KB
     'l1d_size': [64 * 1024], # 64 KB
-    'l2_size': [512 * 1024], # 512 KB
-    'l3_size': [1024 * 1024], # 1 MB
-    'peak_bw': [16 * 1024], #[1024, 4 * 1024, 16 * 1024, 64 * 1024, 256 * 1024],
-    'mat_size': [128] # 16 M entries => 64MB matrix
+    'l2_size': [1024 * 1024], # 1 MB
+    'l3_size': [4096 * 1024], # 4 MB
+    'peak_bw': [32 * 1024], #[1024, 4 * 1024, 16 * 1024, 64 * 1024, 256 * 1024],
+    'mat_size': [256] 
 }
 
 param_names = ['num_cores', 'l1i_size', 'l1d_size', 'l2_size', 'l3_size', 'peak_bw', 'mat_size']
@@ -41,6 +41,11 @@ if (sys.argv[2]):
         f.write(sys.argv[2])
 
 procs = []
+stats = {
+    'max_core_cycles': MaxCoreCycles,
+    # 'avg_cont_cycles': AvgContCycles
+}
+stat_names = ['max_core_cycles']
 
 with open(run_dir+'/run_details.txt','w') as f:
     f.write('Run\tParameters\n')
@@ -57,28 +62,28 @@ with open(run_dir+'/run_details.txt','w') as f:
         procs.append(subprocess.Popen(['zsim', 'config.cfg'], cwd=workdir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
         procs[-1].wait()
 
-#for proc in procs:
-#    proc.wait()
+        uname = 'test_' + str(run)
+        workdir = run_dir + '/' + uname
+        logout = workdir + '/zsim.out'
 
-#p = str(procs[0].stdout.readlines())
-#print('p is ', p)
+        out_data = list(param_list) + [
+            stats[stat_name](logout)
+            for stat_name in stat_names
+	]
 
-stats = {
-    'max_core_cycles': MaxCoreCycles,
-    # 'avg_cont_cycles': AvgContCycles
-}
-stat_names = ['max_core_cycles']
+        print(', '.join([str(data) for data in out_data]))
 
-print(', '.join(param_names + stat_names))
-for run,param_list in zip(runs,param_lists):
-    uname = 'test_' + str(run)
-    workdir = run_dir + '/' + uname
-    logout = workdir + '/zsim.out'
-    print(logout+"\n")
 
-    out_data = list(param_list) + [
-        stats[stat_name](logout)
-        for stat_name in stat_names
-    ]
+#print(', '.join(param_names + stat_names))
+#for run,param_list in zip(runs,param_lists):
+#    uname = 'test_' + str(run)
+#    workdir = run_dir + '/' + uname
+#    logout = workdir + '/zsim.out'
+#    print(logout+"\n")
 
-    print(', '.join([str(data) for data in out_data]))
+#    out_data = list(param_list) + [
+#        stats[stat_name](logout)
+#        for stat_name in stat_names
+#    ]
+
+#    print(', '.join([str(data) for data in out_data]))

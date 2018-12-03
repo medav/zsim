@@ -6,7 +6,7 @@
 sys = {
     cores = {
         c = {
-            cores = 64; 
+            cores = {num_cores}; 
             type = "Timing";
             dcache = "l1d";
             icache = "l1i";
@@ -17,7 +17,7 @@ sys = {
 
     caches = {
         l1d = {
-            caches = 64; 
+            caches = {num_cores}; 
             size = 16384;
             latency = 4;
             array : 
@@ -28,7 +28,7 @@ sys = {
             };
         };
         l1i = {
-            caches = 64;
+            caches = {num_cores};
             size = 16384;
             latency = 3;
             array : 
@@ -40,11 +40,11 @@ sys = {
         };
         l2prefetcher = {
             isPrefetcher = true;
-            prefetchers = 64;
+            prefetchers = {num_cores};
             children = "l1d";    
         }
         l2 = {
-            caches = 64;
+            caches = {num_cores};
             size = 1048576;
             children = "l2prefetcher|l1i";
             type = "Simple";
@@ -54,7 +54,7 @@ sys = {
             caches = 1;
             size = 4194304;
             latency = 27;
-//	    nonInclusiveHack = true;
+	    //nonInclusiveHack = true;
             children = "l2";
             type = "Simple";
         };
@@ -73,8 +73,7 @@ sim = {
 };
 
 process0 = {
-#    command = "naive-matmul 256 512";
-#    command = "blackscholes 64 /home/gaurav/GraduateStudies/CS752/Tools/parsec-3.0/pkgs/apps/blackscholes/inputs/in_16K.txt abc.txt";
-    command = "swaptions -ns 256 -sm 1024 -nt 64"
+    command = "naive-matmul {num_cores} 512";
+#    command = "blackscholes {num_cores} /home/gaurav/GraduateStudies/CS752/Tools/parsec-3.0/pkgs/apps/blackscholes/inputs/in_16K.txt abc.txt";
     startFastForwarded = False;
 };
