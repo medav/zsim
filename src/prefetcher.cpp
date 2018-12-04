@@ -101,7 +101,7 @@ uint64_t StreamPrefetcher::access(MemReq & req)
     SecondFetchRecord.clear();
     wbAcc.clear();
 
-    longerCycle = pfRespCycle = respCycle = parent->access(req);
+    longerCycle = pfRespCycle = respCycle = 0; // parent->access(req);
 
     if (likely(evRec && evRec->hasRecord())){
         wbAcc = evRec->popRecord();
@@ -148,29 +148,28 @@ uint64_t StreamPrefetcher::access(MemReq & req)
                 GETS,
                 req.childId,
                 &state,
-                respCycle, // start after the demand fetch
+                reqCycle, // since moved the demand fetch to. // respCycle, // start after the demand fetch
                 req.childLock,
                 state,
                 req.srcId,
                 MemReq::PREFETCH
             };
-//            pfRespCycle = parent->access(pfReq); // update the access for next address
-	        *req.state = req_state;
-            array[idx][queBottom[idx]].time.fill(respCycle,pfRespCycle);
+            pfRespCycle = parent->access(pfReq); // update the access for next address
+            *req.state = req_state;
+            array[idx][queBottom[idx]].time.fill(reqCycle,pfRespCycle); // .fill(respCycle,pfRespCycle);
             array[idx][queBottom[idx]].lastCycle = pfRespCycle;
             array[idx][queBottom[idx]].valid = true;
 
             queBottom[idx]++;       // points to the next available slot
         }
-        longerCycle = MAX(pfRespCycle,respCycle);
+        //longerCycle = MAX(pfRespCycle,respCycle);
     } else { // prefetch Hit
     //    if(array[idx][queTop[idx]].valid==true && (reqCycle > array[idx][queTop[idx]].time.respCycle)){ // check whether the prefetch data is valid or not
+	    array[idx][0].ts = timestamp++; // just update the top entry with the time stamp
             profPageHits.inc();  
             numHits[idx]++;         // could be removed            
-            // incremental prefetches
             uint32_t entriesOccupied = (queBottom[idx] > queTop[idx]) ? queBottom[idx]-queTop[idx] : queTop[idx]-queBottom[idx];
             uint32_t numPrefetchers = (pow(2,numHits[idx]) > (pfEntries-entriesOccupied)) ? (pfEntries-entriesOccupied) : pow(2,numHits[idx]);
-            //DBG("%s: PAGE HIT idx %d Top Pointer %d numHits[%d] %d numPrefetchers %d", name.c_str(), idx, queTop[idx], idx, numHits[idx], numPrefetchers); //);
 
             for (uint8_t i=0; i<numPrefetchers; i++){
                 if( queBottom[idx] != queTop[idx]) {
@@ -200,19 +199,15 @@ uint64_t StreamPrefetcher::access(MemReq & req)
         	    array[idx][queBottom[idx]].valid = true;
 		    
 		    reqCycle = pfRespCycle; // for next line start cycle
-
-                    //DBG("pageAddr %016X lineAddr %016X pfRespCycle %d queBottom[idx] %d",tag[idx][queBottom[idx]],nextLineAddr,pfRespCycle,queBottom[idx])
                     queBottom[idx] = (queBottom[idx] > pfEntries-1) ? 0 : queBottom[idx] + 1;       // adding an entry to the designated buffer
                 }
             }
-	longerCycle = MAX(respCycle,pfRespCycle);    
+//	longerCycle = MAX(respCycle,pfRespCycle);    
         queTop[idx]++;          // increments the head of the queue on a Hit  
     }
 
-    // since this was updated in the processAccess call
-    //if (wbAcc.isValid())
-    //        evRec->pushRecord(wbAcc);
-
+    respCycle = parent->access(req);
+    longerCycle = MAX(respCycle,pfRespCycle);
     req.childId = origChildId;
 
     return longerCycle;
