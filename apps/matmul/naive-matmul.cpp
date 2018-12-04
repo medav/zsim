@@ -38,8 +38,8 @@ static inline void compute_element(
     for (int i = 0; i < gd->mat_size; i++) {
 
         mat_o[MatIndex(gd->mat_size, row, col)] +=
-            mat_a[MatIndex(gd->mat_size, row, shuffle_64[i])] *
-            mat_b[MatIndex(gd->mat_size, shuffle_64[i], col)];
+            mat_a[MatIndex(gd->mat_size, row, i)] *
+            mat_b[MatIndex(gd->mat_size, i, col)];
     }
 }
 

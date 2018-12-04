@@ -15,12 +15,12 @@ outdir = sys.argv[1]
 template = open(template_filename, 'r').read()
 
 params = {
-    'num_cores': [1, 2, 4, 8, 12, 16, 24, 32, 64, 96, 128, 196, 256],
-    'l1i_size': [32 * 1024], # 32KB
-    'l1d_size': [64 * 1024], # 64 KB
+    'num_cores': [1, 2, 4, 8, 16, 32, 64, 96, 128, 196, 256],
+    'l1i_size': [16 * 1024], # 32KB
+    'l1d_size': [16 * 1024], # 64 KB
     'l2_size': [512 * 1024], # 512 KB
     'l3_size': [1024 * 1024], # 1 MB
-    'peak_bw': [4],
+    'peak_bw': [1024],
     'mat_size': [64] # 16 M entries => 64MB matrix
 }
 
@@ -30,10 +30,11 @@ param_lists = list(itertools.product(*[params[key] for key in param_names]))
 
 stats = {
     'max_core_cycles': MaxCoreCycles,
+    'read_count': MemRdCount,
     # 'avg_cont_cycles': AvgContCycles
 }
 
-stat_names = ['max_core_cycles']
+stat_names = ['max_core_cycles', 'read_count']
 
 if not os.path.exists(outdir):
     os.mkdir(outdir)

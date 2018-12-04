@@ -23,92 +23,53 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "bithacks.h"
-#include "event_recorder.h"
 #include "prefetcher.h"
-#include "timing_event.h"
-#include "zsim.h"
+#include "bithacks.h"
 
-#define DBG(args...) info(args)
-//#define DBG(args...)
+//#define DBG(args...) info(args)
+#define DBG(args...)
 
-void StreamPrefetcher::setParents(uint32_t _childId, const g_vector < MemObject * >&parents, Network * network)
-{
+void StreamPrefetcher::setParents(uint32_t _childId, const g_vector<MemObject*>& parents, Network* network) {
     childId = _childId;
-    if (parents.size() != 1)
-        panic("Must have one parent");
-    if (network)
-        panic("Network not handled");
+    if (parents.size() != 1) panic("Must have one parent");
+    if (network) panic("Network not handled");
     parent = parents[0];
 }
 
-void StreamPrefetcher::setChildren(const g_vector < BaseCache * >&children, Network * network)
-{
-    if (children.size() < 1)
-        panic("Must have one children");
-    if (network)
-        panic("Network not handled");
+void StreamPrefetcher::setChildren(const g_vector<BaseCache*>& children, Network* network) {
+    if (children.size() != 1) panic("Must have one children");
+    if (network) panic("Network not handled");
     child = children[0];
 }
 
-void StreamPrefetcher::initStats(AggregateStat * parentStat)
-{
-    AggregateStat *s = new AggregateStat();
+void StreamPrefetcher::initStats(AggregateStat* parentStat) {
+    AggregateStat* s = new AggregateStat();
     s->init(name.c_str(), "Prefetcher stats");
-    profAccesses.init("acc", "Accesses");
-    s->append(&profAccesses);
-    profPrefetches.init("pf", "Issued prefetches");
-    s->append(&profPrefetches);
-    profDoublePrefetches.init("dpf", "Issued double prefetches");
-    s->append(&profDoublePrefetches);
-    profPageHits.init("pghit", "Page/entry hit");
-    s->append(&profPageHits);
-    profHits.init("hit", "Prefetch buffer hits, short and full");
-    s->append(&profHits);
-    profShortHits.init("shortHit", "Prefetch buffer short hits");
-    s->append(&profShortHits);
-    profStrideSwitches.init("strideSwitches", "Predicted stride switches");
-    s->append(&profStrideSwitches);
-    profLowConfAccs.init("lcAccs", "Low-confidence accesses with no prefetches");
-    s->append(&profLowConfAccs);
+    profAccesses.init("acc", "Accesses"); s->append(&profAccesses);
+    profPrefetches.init("pf", "Issued prefetches"); s->append(&profPrefetches);
+    profDoublePrefetches.init("dpf", "Issued double prefetches"); s->append(&profDoublePrefetches);
+    profPageHits.init("pghit", "Page/entry hit"); s->append(&profPageHits);
+    profHits.init("hit", "Prefetch buffer hits, short and full"); s->append(&profHits);
+    profShortHits.init("shortHit", "Prefetch buffer short hits"); s->append(&profShortHits);
+    profStrideSwitches.init("strideSwitches", "Predicted stride switches"); s->append(&profStrideSwitches);
+    profLowConfAccs.init("lcAccs", "Low-confidence accesses with no prefetches"); s->append(&profLowConfAccs);
     parentStat->append(s);
 }
 
-uint64_t StreamPrefetcher::access(MemReq & req)
-{
-    uint64_t longerCycle, pfRespCycle, respCycle, reqCycle;
+uint64_t StreamPrefetcher::access(MemReq& req) {
     uint32_t origChildId = req.childId;
-
     req.childId = childId;
-    reqCycle = req.cycle;
 
-    if (req.type != GETS) {
-        respCycle = parent->access(req);
-        req.childId = origChildId;
-        return respCycle;       		//other reqs ignored, including stores
-    }
+    if (req.type != GETS) return parent->access(req); //other reqs ignored, including stores
 
     profAccesses.inc();
 
-    EventRecorder *evRec = zinfo->eventRecorders[req.srcId];
-
-    StreamPrefetcherEvent *newEv;
-    TimingRecord nla, wbAcc, FirstFetchRecord, SecondFetchRecord;
-
-    FirstFetchRecord.clear();
-    SecondFetchRecord.clear();
-    wbAcc.clear();
-
-    longerCycle = pfRespCycle = respCycle = parent->access(req);
-
-    if (likely(evRec && evRec->hasRecord()))
-        wbAcc = evRec->popRecord();
+    uint64_t reqCycle = req.cycle;
+    uint64_t respCycle = 0; //parent->access(req);
 
     Address pageAddr = req.lineAddr >> 6;
     uint32_t pos = req.lineAddr & (64-1);
     uint32_t idx = 16;
-
-
     // This loop gets unrolled and there are no control dependences. Way faster than a break (but should watch for the avoidable loop-carried dep)
     for (uint32_t i = 0; i < 16; i++) {
         bool match = (pageAddr == tag[i]);
@@ -152,12 +113,12 @@ uint64_t StreamPrefetcher::access(MemReq & req)
         bool shortPrefetch = false;
         if (e.valid[pos]) {
             uint64_t pfRespCycle = e.times[pos].respCycle;
-            shortPrefetch = pfRespCycle > respCycle;
+            //shortPrefetch = pfRespCycle > respCycle;
             e.valid[pos] = false;  // close, will help with long-lived transactions
-            respCycle = MAX(pfRespCycle, respCycle);
+            respCycle = MAX(pfRespCycle, 0);
             e.lastCycle = MAX(respCycle, e.lastCycle);
             profHits.inc();
-            if (shortPrefetch) profShortHits.inc();
+            //if (shortPrefetch) profShortHits.inc();
             DBG("%s: pos %d prefetched on %ld, pf resp %ld, demand resp %ld, short %d", name.c_str(), pos, e.times[pos].startCycle, pfRespCycle, respCycle, shortPrefetch);
         }
 
@@ -177,53 +138,23 @@ uint64_t StreamPrefetcher::access(MemReq & req)
 
                 if (prefetchPos < 64 && !e.valid[prefetchPos]) {
                     MESIState state = I;
-                    MESIState req_state = *req.state;
-
-                    MemReq pfReq = {
-                        req.lineAddr + prefetchPos - pos,
-                        GETS,
-                        req.childId,
-                        &state,
-                        reqCycle,
-                        req.childLock,
-                        state,
-                        req.srcId,
-                        MemReq::PREFETCH
-                    };
-                    pfRespCycle = parent->access(pfReq);
-                    longerCycle = (wbAcc.reqCycle > pfRespCycle) ? wbAcc.reqCycle : pfRespCycle;
-
-                    *req.state = req_state;
-
-					     e.valid[prefetchPos] = true;
-                    e.times[prefetchPos].fill(reqCycle, longerCycle);
-
+                    MemReq pfReq = {req.lineAddr + prefetchPos - pos, GETS, req.childId, &state, reqCycle, req.childLock, state, req.srcId, MemReq::PREFETCH};
+                    uint64_t pfRespCycle = parent->access(pfReq);  // FIXME, might segfault
+                    e.valid[prefetchPos] = true;
+                    e.times[prefetchPos].fill(reqCycle, pfRespCycle);
                     profPrefetches.inc();
-
 
                     if (shortPrefetch && fetchDepth < 8 && prefetchPos + stride < 64 && !e.valid[prefetchPos + stride]) {
                         prefetchPos += stride;
                         pfReq.lineAddr += stride;
                         pfRespCycle = parent->access(pfReq);
-						      longerCycle = (likely(longerCycle < pfRespCycle)) ? pfRespCycle : longerCycle;
-
                         e.valid[prefetchPos] = true;
-                        e.times[prefetchPos].fill(reqCycle, longerCycle);
+                        e.times[prefetchPos].fill(reqCycle, pfRespCycle);
                         profPrefetches.inc();
                         profDoublePrefetches.inc();
-                        if (likely(nla.respCycle < longerCycle)) {
-                             nla.respCycle = longerCycle;
-                        }
-                        if (likely(evRec && evRec->hasRecord())) {
-                            info("[%s] PFL the transaction had generated a wb event!", name.c_str());
-                            SecondFetchRecord = evRec->popRecord();
-                        }
                     }
                     e.lastPrefetchPos = prefetchPos;
                     assert(state == I);  // prefetch access should not give us any permissions
-
-                    req.childId = origChildId;
-                    return longerCycle;
                 }
             } else {
                 profLowConfAccs.inc();
@@ -243,19 +174,20 @@ uint64_t StreamPrefetcher::access(MemReq & req)
             e.lastPrefetchPos = pos;
         }
 
-    e.lastLastPos = e.lastPos;
-    e.lastPos = pos;
+        e.lastLastPos = e.lastPos;
+        e.lastPos = pos;
     }
 
-    if (wbAcc.isValid())
-            evRec->pushRecord(wbAcc);
+    uint64_t demand_resp = parent->access(req);
+    respCycle = MAX(respCycle, demand_resp);
 
     req.childId = origChildId;
-
-    return longerCycle;
+    return respCycle;
 }
 
 // nop for now; do we need to invalidate our own state?
 uint64_t StreamPrefetcher::invalidate(const InvReq& req) {
     return child->invalidate(req);
 }
+
+

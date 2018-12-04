@@ -37,7 +37,6 @@ sys = {
             caches = {num_cores};
             size = {l2_size};
             children = "pf|l1i";
-            nonInclusiveHack = true;
             type = "Simple";
         };
 

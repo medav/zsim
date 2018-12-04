@@ -26,5 +26,15 @@ def MaxCoreCycles(outlog):
     except:
         return None
 
+def MemRdCount(outlog):
+    try:
+        with open(outlog, 'r') as f:
+            for line in f:
+                if line.startswith('   rd:'):
+                    return int(line.strip().split()[1])
+
+    except:
+        return None
+
 def AvgContCycles(outlog):
     return 0
