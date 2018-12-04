@@ -83,7 +83,7 @@ uint64_t StreamPrefetcher::access(MemReq& req) {
     auto block = req.lineAddr & ~0x3F;
 
     if (block == curBlock) {
-        return respCycle;
+        return parent->access(req);
     }
 
     curBlock = block;
@@ -107,7 +107,7 @@ uint64_t StreamPrefetcher::access(MemReq& req) {
         MemReq::PREFETCH
     };
 
-    pfRespCycle = parent->access(pfReq);
+    uint64_t pfRespCycle = parent->access(pfReq);
     respCycle = (respCycle > pfRespCycle) ? respCycle : pfRespCycle;
 
     }
