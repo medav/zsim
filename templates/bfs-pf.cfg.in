@@ -65,6 +65,6 @@ sim = {
 };
 
 process0 = {
-    command = "bfs {num_cores} {mat_size}";
+    command = "bfs {num_cores} 16";
     startFastForwarded = True;
 };
